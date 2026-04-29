@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VimNotes</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Marked.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #16161e;
+            --text-color: #a9b1d6;
+            --blue: #7aa2f7;
+            --orange: #ff9e64;
+            --green: #9ece6a;
+            --selection: #283457;
+            --sidebar-bg: #1a1b26;
+            --status-bg: #1f2335;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        ::selection {
+            background-color: var(--selection);
+        }
+
+        /* Sidebar */
+        #sidebar {
+            width: 250px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--selection);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        #sidebar-header {
+            padding: 15px;
+            border-bottom: 1px solid var(--selection);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #new-note-btn {
+            background: transparent;
+            color: var(--green);
+            border: 1px solid var(--green);
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+
+        #new-note-btn:hover {
+            background-color: var(--green);
+            color: var(--bg-color);
+        }
+
+        #notes-list {
+            list-style: none;
+            overflow-y: auto;
+            flex: 1;
+            padding: 10px 0;
+        }
+
+        .note-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            word-break: break-all;
+        }
+
+        .note-item:hover, .note-item.active {
+            background-color: var(--selection);
+        }
+
+        .note-item i {
+            color: var(--blue);
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        /* Main Area */
+        #main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-width: 0; /* Important for flex child with overflow */
+        }
+
+        #toolbar {
+            padding: 10px 20px;
+            display: flex;
+            justify-content: flex-end;
+            border-bottom: 1px solid var(--selection);
+        }
+
+        #save-btn {
+            background: transparent;
+            color: var(--blue);
+            border: 1px solid var(--blue);
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+
+        #save-btn:hover {
+            background-color: var(--blue);
+            color: var(--bg-color);
+        }
+
+        #editor-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            padding-bottom: 30px; /* space for status line */
+        }
+
+        #editor-pane, #preview-pane {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        #editor-pane {
+            border-right: 1px solid var(--selection);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Mobile View Support */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            #sidebar {
+                width: 100%;
+                height: 30%;
+                border-right: none;
+                border-bottom: 1px solid var(--selection);
+            }
+            #editor-container {
+                flex-direction: column;
+            }
+            #editor-pane {
+                border-right: none;
+                border-bottom: 1px solid var(--selection);
+            }
+            #editor-pane, #preview-pane {
+                height: 50%;
+            }
+        }
+
+        #note-title {
+            background: transparent;
+            border: none;
+            color: var(--orange);
+            font-size: 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            margin-bottom: 20px;
+            outline: none;
+            width: 100%;
+        }
+
+        #note-title::placeholder {
+            color: #565f89;
+        }
+
+        #note-content {
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            resize: none;
+            outline: none;
+            flex: 1;
+            width: 100%;
+            line-height: 1.5;
+        }
+
+        #note-content::placeholder {
+            color: #565f89;
+        }
+
+        #preview-pane {
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        #preview-pane h1, #preview-pane h2, #preview-pane h3 {
+            color: var(--orange);
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+
+        #preview-pane p {
+            margin-bottom: 1em;
+        }
+
+        #preview-pane code {
+            background-color: var(--selection);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        #preview-pane pre {
+            background-color: var(--selection);
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin-bottom: 1em;
+        }
+
+        #preview-pane a {
+            color: var(--blue);
+        }
+
+        #preview-pane ul, #preview-pane ol {
+            margin-left: 20px;
+            margin-bottom: 1em;
+        }
+
+        /* Status Line */
+        #status-line {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background-color: var(--status-bg);
+            border-top: 1px solid var(--selection);
+            display: flex;
+            align-items: center;
+            font-size: 0.85rem;
+            z-index: 10;
+        }
+
+        .status-mode {
+            background-color: var(--blue);
+            color: var(--bg-color);
+            padding: 0 15px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+        }
+
+        .status-file {
+            padding: 0 15px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-msg {
+            margin-left: auto;
+            padding: 0 15px;
+            color: var(--green);
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div id="sidebar-header">
+            <span style="font-weight:bold; color: var(--blue);"><i data-lucide="book" style="width:18px;height:18px;vertical-align:text-bottom;"></i> VimNotes</span>
+            <button id="new-note-btn"><i data-lucide="plus" style="width:14px;height:14px;"></i> Nueva</button>
+        </div>
+        <ul id="notes-list">
+            <!-- Notes will be injected here -->
+        </ul>
+    </div>
+
+    <div id="main">
+        <div id="toolbar">
+            <button id="save-btn"><i data-lucide="save" style="width:14px;height:14px;"></i> Guardar</button>
+        </div>
+        <div id="editor-container">
+            <div id="editor-pane">
+                <input type="text" id="note-title" placeholder="nombre-archivo.md" />
+                <textarea id="note-content" placeholder="Escribe tu nota aquí (Markdown)..."></textarea>
+            </div>
+            <div id="preview-pane">
+                <!-- Markdown preview will be rendered here -->
+            </div>
+        </div>
+
+        <div id="status-line">
+            <div class="status-mode" id="status-mode">NORMAL</div>
+            <div class="status-file"><i data-lucide="file-text" style="width:14px;height:14px;"></i> <span id="current-filename">[No Name]</span></div>
+            <div class="status-msg" id="status-msg"></div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // DOM Elements
+        const notesList = document.getElementById('notes-list');
+        const noteTitle = document.getElementById('note-title');
+        const noteContent = document.getElementById('note-content');
+        const previewPane = document.getElementById('preview-pane');
+        const currentFilename = document.getElementById('current-filename');
+        const saveBtn = document.getElementById('save-btn');
+        const newNoteBtn = document.getElementById('new-note-btn');
+        const statusMode = document.getElementById('status-mode');
+        const statusMsg = document.getElementById('status-msg');
+
+        let currentFile = null;
+
+        // Fetch notes list
+        async function loadNotesList() {
+            try {
+                const response = await fetch('/api/notes');
+                const data = await response.json();
+                notesList.innerHTML = '';
+                if (data.notes) {
+                    data.notes.forEach(note => {
+                        const li = document.createElement('li');
+                        li.className = 'note-item';
+                        if (currentFile === note) {
+                            li.classList.add('active');
+                        }
+                        li.innerHTML = `<i data-lucide="file-text"></i> <span>${note}</span>`;
+                        li.onclick = () => loadNote(note);
+                        notesList.appendChild(li);
+                    });
+                    lucide.createIcons({ root: notesList });
+                }
+            } catch (error) {
+                console.error("Error loading notes:", error);
+            }
+        }
+
+        // Load a specific note
+        async function loadNote(filename) {
+            try {
+                const response = await fetch(`/api/notes/${filename}`);
+                const data = await response.json();
+                if (data.filename) {
+                    currentFile = data.filename;
+                    noteTitle.value = data.filename;
+                    noteContent.value = data.content;
+                    currentFilename.textContent = data.filename;
+                    renderPreview();
+                    loadNotesList(); // Refresh active state
+                    setStatus('NORMAL', 'Archivo cargado', '--blue');
+                }
+            } catch (error) {
+                console.error("Error loading note:", error);
+                setStatus('ERROR', 'Error al cargar', '--orange');
+            }
+        }
+
+        // Save note
+        async function saveNote() {
+            let filename = noteTitle.value.trim();
+            if (!filename) {
+                filename = 'untitled.md';
+                noteTitle.value = filename;
+            }
+            if (!filename.endsWith('.md')) {
+                filename += '.md';
+                noteTitle.value = filename;
+            }
+
+            const content = noteContent.value;
+
+            try {
+                const response = await fetch(`/api/notes/${filename}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ content })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    currentFile = data.filename;
+                    currentFilename.textContent = data.filename;
+                    loadNotesList();
+                    setStatus('NORMAL', 'Guardado', '--green');
+                    setTimeout(() => {
+                        setStatus('NORMAL', '', '--blue');
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error("Error saving note:", error);
+                setStatus('ERROR', 'Error al guardar', '--orange');
+            }
+        }
+
+        // New note
+        function createNewNote() {
+            currentFile = null;
+            noteTitle.value = '';
+            noteContent.value = '';
+            currentFilename.textContent = '[No Name]';
+            renderPreview();
+            loadNotesList(); // clear active state
+            setStatus('INSERT', 'Nueva nota', '--green');
+            noteTitle.focus();
+        }
+
+        // Render Markdown
+        function renderPreview() {
+            const content = noteContent.value;
+            previewPane.innerHTML = marked.parse(content);
+        }
+
+        // Update Status Line
+        function setStatus(mode, msg, colorVar) {
+            statusMode.textContent = mode;
+            statusMode.style.backgroundColor = `var(${colorVar || '--blue'})`;
+            statusMode.style.color = 'var(--bg-color)';
+            if (mode === 'ERROR' || mode === 'INSERT') {
+                 statusMode.style.color = '#000000'; // Make text more visible on orange/green
+            }
+            statusMsg.textContent = msg;
+            if(msg !== '' && mode !== 'ERROR') {
+                setTimeout(() => {
+                    statusMsg.textContent = '';
+                }, 3000);
+            }
+        }
+
+        // Event Listeners
+        noteContent.addEventListener('input', () => {
+            renderPreview();
+        });
+
+        noteContent.addEventListener('focus', () => {
+            if (statusMode.textContent !== 'INSERT') {
+                setStatus('INSERT', '', '--green');
+            }
+        });
+        noteContent.addEventListener('blur', () => {
+            setStatus('NORMAL', '', '--blue');
+        });
+
+        noteTitle.addEventListener('focus', () => {
+            if (statusMode.textContent !== 'INSERT') {
+                setStatus('INSERT', '', '--green');
+            }
+        });
+        noteTitle.addEventListener('blur', () => {
+            setStatus('NORMAL', '', '--blue');
+        });
+
+        saveBtn.addEventListener('click', saveNote);
+        newNoteBtn.addEventListener('click', createNewNote);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                saveNote();
+            }
+        });
+
+        // Initialize
+        loadNotesList();
+    </script>
+</body>
+</html>
